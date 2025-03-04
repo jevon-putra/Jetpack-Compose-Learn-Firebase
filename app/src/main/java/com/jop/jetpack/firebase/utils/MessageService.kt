@@ -1,5 +1,6 @@
 package com.jop.jetpack.firebase.utils
 
+import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
@@ -11,55 +12,59 @@ import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import com.jop.jetpack.firebase.MainActivity
 import com.jop.jetpack.firebase.R
+import com.jop.jetpack.firebase.data.DataNotification
+import kotlinx.serialization.json.Json
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
 class MessageService: FirebaseMessagingService() {
-    private lateinit var intentNotification: Intent
     private lateinit var notificationManager: NotificationManager
     private lateinit var notificationBuilder: NotificationCompat.Builder
 
     override fun onMessageReceived(message: RemoteMessage) {
         super.onMessageReceived(message)
-        showNotification(this, message)
+
+        if(message.data.isNotEmpty()) {
+            val jsonString= Json.encodeToString(message.data)
+            val data = Json.decodeFromString<DataNotification>(jsonString)
+
+            showNotification(data)
+        }
     }
 
-    private fun showNotification(context: Context, notification: RemoteMessage) {
+    private fun showNotification(data: DataNotification) {
         val notificationId: Int = SimpleDateFormat("ddhhmmss",  Locale("id", "ID")).format(Date()).toInt()
-        val data = notification.data
-
-        intentNotification = MainActivity.newInstance(
-            context, targetValue = data["target_value"].toString()
-        )
-
-        intentNotification.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
 
         try {
+            val intent = MainActivity.newInstance(applicationContext, data.targetValue, data.targetData)
+                .apply {
+                    flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                }
+
+            val pIntent = PendingIntent.getActivity(
+                applicationContext,
+                System.currentTimeMillis().toInt(),
+                intent,
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+            )
+
             val notificationIcon: Int = R.mipmap.ic_launcher
-            val resultPendingIntent = PendingIntent.getActivity(context, 1001, intentNotification, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
             val notificationSound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
-            notificationBuilder = NotificationCompat.Builder(context, "Testing Notification")
+
+            notificationBuilder = NotificationCompat.Builder(this, "Testing Notification")
                 .setSmallIcon(notificationIcon)
-                .setContentTitle(notification.notification!!.title)
-                .setAutoCancel(true)
+                .setContentTitle(data.title)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(data.body))
                 .setSound(notificationSound)
-                .setStyle(NotificationCompat.BigTextStyle().bigText(notification.notification!!.body))
+                .setContentIntent(pIntent)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setAutoCancel(true)
 
-            notificationBuilder.priority = NotificationCompat.PRIORITY_HIGH
+            notificationManager = this.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
-            notificationBuilder.setContentIntent(resultPendingIntent)
-
-            notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-
-            // Since android Oreo notification channel is needed.
-//            val importance = if(isHigh) NotificationManager.IMPORTANCE_HIGH else NotificationManager.IMPORTANCE_DEFAULT
-//            val channel = NotificationChannel(
-//                channelId,
-//                if (isHigh) context.resources.getString(R.string.txt_trans) else "General",
-//                importance
-//            )
-//            notificationManager.createNotificationChannel("channel")
+            val channel = NotificationChannel("Testing Notification", "General", NotificationManager.IMPORTANCE_HIGH)
+            notificationManager.createNotificationChannel(channel)
             notificationManager.notify(notificationId, notificationBuilder.build())
         } catch (e: Exception){
             Log.e("TEST ERROR", e.message.toString())

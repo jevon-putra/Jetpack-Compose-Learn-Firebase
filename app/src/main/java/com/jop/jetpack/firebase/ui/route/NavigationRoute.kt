@@ -13,6 +13,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.navigation
+import com.jop.jetpack.firebase.MainViewModel
 import com.jop.jetpack.firebase.presentation.dashboard.view.DashboardScreen
 import com.jop.jetpack.firebase.presentation.location.view.LocationScreen
 import com.jop.jetpack.firebase.presentation.location.viewmodel.LocationViewModel
@@ -20,7 +21,12 @@ import com.jop.jetpack.firebase.presentation.welcome.view.WelcomeScreen
 import org.koin.androidx.compose.koinViewModel
 
 @Composable
-fun NavigationRoute(modifier: Modifier, navController: NavHostController, showBottomBar: (Boolean) -> Unit) {
+fun NavigationRoute(
+    modifier: Modifier,
+    navController: NavHostController,
+    mainViewModel: MainViewModel,
+    showBottomBar: (Boolean) -> Unit
+) {
     NavHost(
         modifier = modifier,
         navController = navController,
@@ -36,7 +42,7 @@ fun NavigationRoute(modifier: Modifier, navController: NavHostController, showBo
         ){
             composable(route = Route.HOME_DASHBOARD){
                 showBottomBar(true)
-                DashboardScreen(navController = navController)
+                DashboardScreen(navController = navController, mainViewModel::onEvent, mainViewModel.state)
             }
 
             composable(route = Route.HOME_LOCATION){
